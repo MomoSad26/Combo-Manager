@@ -52,9 +52,9 @@ class ComboProvider extends ChangeNotifier {
     await recargar();
   }
 
-  Future<bool> añadirProducto(int comboId, int productoId, int cantidad) async {
+  Future<bool> anadirProducto(int comboId, int productoId, int cantidad) async {
     final configuracion = await _configuracionRepositorio.obtener();
-    final agregado = await _repositorio.añadirProducto(comboId, productoId, cantidad, configuracion);
+    final agregado = await _repositorio.anadirProducto(comboId, productoId, cantidad, configuracion);
     if (agregado) await recargar();
     return agregado;
   }
