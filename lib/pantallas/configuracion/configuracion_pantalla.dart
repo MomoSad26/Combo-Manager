@@ -92,11 +92,11 @@ class ConfiguracionPantalla extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 24), children: [
         Text('MARGEN', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        _ControlNumero(valor: FormatoNumeros.moneda(config.margen), onMenos: config.margen - 0.1 > 0 ? () => _ejecutar(context, () => provider.cambiarMargen(double.parse((config.margen - 0.1).toStringAsFixed(8)))) : null, onMas: () => _ejecutar(context, () => provider.cambiarMargen(double.parse((config.margen + 0.1).toStringAsFixed(8)))), onTap: () => _editarMargen(context, config.margen)),
+        _ControlNumero(valor: FormatoNumeros.moneda(config.margen), onMenos: config.margen - 0.1 > 0 ? () => _ejecutar(context, () => provider.ajustarMargen(-0.1)) : null, onMas: () => _ejecutar(context, () => provider.ajustarMargen(0.1)), onTap: () => _editarMargen(context, config.margen)),
         const SizedBox(height: 22),
         Text('TASA DE REFERENCIA', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        _ControlNumero(valor: FormatoNumeros.moneda(config.tasaReferencia), onMenos: config.tasaReferencia - 5 > 0 ? () => _ejecutar(context, () => provider.cambiarTasa(config.tasaReferencia - 5)) : null, onMas: () => _ejecutar(context, () => provider.cambiarTasa(config.tasaReferencia + 5)), onTap: () => _editarTasa(context, config.tasaReferencia)),
+        _ControlNumero(valor: FormatoNumeros.moneda(config.tasaReferencia), onMenos: config.tasaReferencia - 5 > 0 ? () => _ejecutar(context, () => provider.ajustarTasa(-5)) : null, onMas: () => _ejecutar(context, () => provider.ajustarTasa(5)), onTap: () => _editarTasa(context, config.tasaReferencia)),
         const SizedBox(height: 20),
         const Divider(),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('MODO OSCURO'), value: config.modoOscuro, onChanged: (v) => _ejecutar(context, () => provider.cambiarModoOscuro(v))),

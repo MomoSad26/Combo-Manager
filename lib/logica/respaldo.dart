@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:sqflite/sqflite.dart';
 import '../base_datos/base_datos.dart';
-import '../modelos/configuracion.dart';
 import '../modelos/resultado_importacion.dart';
 import '../repositorios/configuracion_repositorio.dart';
 import 'calculos.dart';
+import 'nombres.dart';
 
 class RespaldoVersionNueva implements Exception {
   const RespaldoVersionNueva();
@@ -128,12 +127,12 @@ class RespaldoService {
       final mapaProductos = <String, int>{};
       final productosActuales = await txn.query('productos', columns: ['id', 'nombre'], orderBy: 'id');
       for (final p in productosActuales) {
-        mapaProductos.putIfAbsent(p['nombre'] as String, () => (p['id'] as num).toInt());
+        mapaProductos.putIfAbsent(normalizarNombre(p['nombre'] as String), () => (p['id'] as num).toInt());
       }
 
       for (final p in productosBackup) {
         final nombre = (p['nombre'] as String).trim();
-        if (mapaProductos.containsKey(nombre)) {
+        if (mapaProductos.containsKey(normalizarNombre(nombre))) {
           productosExistentes++;
           continue;
         }
@@ -144,14 +143,14 @@ class RespaldoService {
           'precio_venta_manual': _booleano(p['precio_venta_manual']) ? 1 : 0,
           'activo': p.containsKey('activo') && !_booleano(p['activo']) ? 0 : 1,
         });
-        mapaProductos[nombre] = id;
+        mapaProductos[normalizarNombre(nombre)] = id;
         productosAgregados++;
       }
 
-      final nombresCombosActuales = (await txn.query('combos', columns: ['nombre'])).map((r) => r['nombre'] as String).toSet();
+      final nombresCombosActuales = (await txn.query('combos', columns: ['nombre'])).map((r) => normalizarNombre(r['nombre'] as String)).toSet();
       for (final c in combosBackup) {
         final nombreCombo = (c['nombre'] as String).trim();
-        if (nombresCombosActuales.contains(nombreCombo)) {
+        if (nombresCombosActuales.contains(normalizarNombre(nombreCombo))) {
           combosExistentes++;
           continue;
         }
@@ -163,7 +162,7 @@ class RespaldoService {
           final nombreProducto = item['producto_nombre'];
           if (nombreProducto is! String || nombreProducto.trim().isEmpty) throw const RespaldoInvalido();
           final nombre = nombreProducto.trim();
-          var productoId = mapaProductos[nombre];
+          var productoId = mapaProductos[normalizarNombre(nombre)];
           if (productoId == null) {
             final compra = _numero(item['producto_precio_compra']);
             final venta = _numero(item['producto_precio_venta']);
@@ -174,7 +173,7 @@ class RespaldoService {
               'precio_venta_manual': _booleano(item['producto_precio_venta_manual']) ? 1 : 0,
               'activo': item.containsKey('producto_activo') && !_booleano(item['producto_activo']) ? 0 : 1,
             });
-            mapaProductos[nombre] = productoId;
+            mapaProductos[normalizarNombre(nombre)] = productoId;
             productosAgregados++;
           }
           final cantidadRaw = item['cantidad'];
@@ -229,7 +228,7 @@ class RespaldoService {
             'ganancia_manual': 0,
           }, where: 'id = ?', whereArgs: [idCombo]);
         }
-        nombresCombosActuales.add(nombreCombo);
+        nombresCombosActuales.add(normalizarNombre(nombreCombo));
         combosAgregados++;
       }
     });

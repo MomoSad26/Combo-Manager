@@ -42,8 +42,13 @@ class _CrearProductoState extends State<CrearProducto> {
     final venta = _ventaManual
         ? (FormatoNumeros.leerNumero(_venta.text) ?? context.read<ProductoProvider>().precioVentaCalculado(compra, config))
         : context.read<ProductoProvider>().precioVentaCalculado(compra, config);
-    await context.read<ProductoProvider>().crear(nombre: _nombre.text.trim(), precioCompra: compra, precioVenta: venta, precioVentaManual: _ventaManual);
-    if (mounted) Navigator.pop(context);
+    final id = await context.read<ProductoProvider>().crear(nombre: _nombre.text.trim(), precioCompra: compra, precioVenta: venta, precioVentaManual: _ventaManual);
+    if (!mounted) return;
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya existe un producto con ese nombre')));
+      return;
+    }
+    Navigator.pop(context);
   }
 
   @override

@@ -57,8 +57,13 @@ class _EditarProductoState extends State<EditarProducto> {
             : _actual.precioVenta)
         : (FormatoNumeros.leerNumero(_venta.text) ?? context.read<ProductoProvider>().precioVentaCalculado(compra, config));
     final manual = _ventaEditada ? true : (_compraEditada ? false : _actual.precioVentaManual);
-    await context.read<ProductoProvider>().guardarEdicion(original: _actual, nombre: _nombre.text.trim(), precioCompra: compra, precioVenta: venta, precioVentaManual: manual);
-    if (mounted) Navigator.pop(context);
+    final guardado = await context.read<ProductoProvider>().guardarEdicion(original: _actual, nombre: _nombre.text.trim(), precioCompra: compra, precioVenta: venta, precioVentaManual: manual);
+    if (!mounted) return;
+    if (!guardado) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya existe un producto con ese nombre')));
+      return;
+    }
+    Navigator.pop(context);
   }
 
   Future<void> _eliminar() async {

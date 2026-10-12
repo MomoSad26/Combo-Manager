@@ -28,17 +28,51 @@ class ConfiguracionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Los cambios se aplican de uno en uno: si se pulsa "+" varias veces seguidas,
+  // cada pulsación parte del valor que dejó la anterior y ninguna se pierde.
+  Future<void> _cola = Future.value();
+
+  Future<void> _enCola(Future<void> Function() operacion) {
+    final resultado = _cola.then((_) => operacion());
+    _cola = resultado.catchError((_) {});
+    return resultado;
+  }
+
   Future<void> cambiarMargen(double valor) async {
     if (valor <= 0) throw ArgumentError('El margen debe ser mayor que cero.');
-    await _repositorio.actualizarMargen(valor);
-    await _aplicarCascada();
+    await _enCola(() async {
+      await _repositorio.actualizarMargen(valor);
+      await _aplicarCascada();
+    });
   }
 
   Future<void> cambiarTasa(double valor) async {
     if (valor <= 0) throw ArgumentError('La tasa debe ser mayor que cero.');
-    await _repositorio.actualizarTasa(valor);
-    await _aplicarCascada();
+    await _enCola(() async {
+      await _repositorio.actualizarTasa(valor);
+      await _aplicarCascada();
+    });
   }
+
+  /// Suma [delta] al margen guardado en el momento de aplicarse. Si el resultado
+  /// no es positivo, no hace nada.
+  Future<void> ajustarMargen(double delta) => _enCola(() async {
+        final actual = await _repositorio.obtener();
+        final nuevo = double.parse((actual.margen + delta).toStringAsFixed(8));
+        if (nuevo <= 0) return;
+        await _repositorio.actualizarMargen(nuevo);
+        await _aplicarCascada();
+      });
+
+  /// Suma [delta] a la tasa guardada en el momento de aplicarse. Si el resultado
+  /// no es positivo, no hace nada.
+  Future<void> ajustarTasa(double delta) => _enCola(() async {
+        final actual = await _repositorio.obtener();
+        final nuevo = double.parse((actual.tasaReferencia + delta).toStringAsFixed(8));
+        if (nuevo <= 0) return;
+        await _repositorio.actualizarTasa(nuevo);
+        await _aplicarCascada();
+      });
 
   Future<void> _aplicarCascada() async {
     _configuracion = await _repositorio.obtener();
@@ -49,9 +83,9 @@ class ConfiguracionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> cambiarModoOscuro(bool valor) async {
-    await _repositorio.actualizarModoOscuro(valor);
-    _configuracion = await _repositorio.obtener();
-    notifyListeners();
-  }
+  Future<void> cambiarModoOscuro(bool valor) => _enCola(() async {
+        await _repositorio.actualizarModoOscuro(valor);
+        _configuracion = await _repositorio.obtener();
+        notifyListeners();
+      });
 }

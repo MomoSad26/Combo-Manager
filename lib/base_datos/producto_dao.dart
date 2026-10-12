@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../logica/nombres.dart';
 import '../modelos/producto.dart';
 
 class ProductoDao {
@@ -64,6 +65,12 @@ class ProductoDao {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<bool> existeNombre(String nombre, {int? excluirId}) async {
+    final buscado = normalizarNombre(nombre);
+    final rows = await db.query('productos', columns: ['id', 'nombre']);
+    return rows.any((r) => (r['id'] as num).toInt() != excluirId && normalizarNombre(r['nombre'] as String) == buscado);
   }
 
   Future<int?> buscarIdPorNombreExacto(

@@ -12,6 +12,9 @@ class ProductoRepositorio {
   Future<List<Producto>> obtenerTodos() async => (await _dao()).obtenerTodos();
   Future<Producto?> obtenerPorId(int id) async => (await _dao()).obtenerPorId(id);
 
+  Future<bool> existeNombre(String nombre, {int? excluirId}) async =>
+      (await _dao()).existeNombre(nombre, excluirId: excluirId);
+
   Future<int> crear({
     required String nombre,
     required double precioCompra,

@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../logica/nombres.dart';
 
 class ComboDao {
   ComboDao(this.db);
@@ -24,7 +25,8 @@ class ComboDao {
   }
 
   Future<bool> existeNombre(String nombre, {int? excluirId, DatabaseExecutor? executor}) async {
-    final rows = await (executor ?? db).query('combos', columns: ['id'], where: excluirId == null ? 'nombre = ?' : 'nombre = ? AND id != ?', whereArgs: excluirId == null ? [nombre] : [nombre, excluirId], limit: 1);
-    return rows.isNotEmpty;
+    final buscado = normalizarNombre(nombre);
+    final rows = await (executor ?? db).query('combos', columns: ['id', 'nombre']);
+    return rows.any((r) => (r['id'] as num).toInt() != excluirId && normalizarNombre(r['nombre'] as String) == buscado);
   }
 }
