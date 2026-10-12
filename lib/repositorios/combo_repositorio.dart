@@ -50,7 +50,7 @@ class ComboRepositorio {
     await db.delete('combos', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<bool> añadirProducto(int comboId, int productoId, int cantidad, Configuracion configuracion) async {
+  Future<bool> anadirProducto(int comboId, int productoId, int cantidad, Configuracion configuracion) async {
     if (cantidad < 1) return false;
     final db = await baseDatos.database;
     final yaExiste = await db.query('combo_items', columns: ['id'], where: 'combo_id = ? AND producto_id = ?', whereArgs: [comboId, productoId], limit: 1);
