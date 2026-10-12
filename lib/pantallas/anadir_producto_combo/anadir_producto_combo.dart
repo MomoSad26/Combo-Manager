@@ -34,7 +34,7 @@ class _AnadirProductoComboState extends State<AnadirProductoCombo> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debes escribir una cantidad')));
       return;
     }
-    final agregado = await context.read<ComboProvider>().añadirProducto(widget.comboId, productoId, resultado.cantidad);
+    final agregado = await context.read<ComboProvider>().anadirProducto(widget.comboId, productoId, resultado.cantidad);
     if (!mounted) return;
     if (!agregado) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este producto ya está en el combo')));
