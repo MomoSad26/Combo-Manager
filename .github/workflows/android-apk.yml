@@ -1,0 +1,46 @@
+name: Compilar APK Android
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v6
+
+      - name: Instalar Flutter estable
+        uses: flutter-actions/setup-flutter@v4
+        with:
+          channel: stable
+          version: latest
+          cache: true
+
+      - name: Generar la carpeta Android
+        run: flutter create --platforms=android --org com.combomanager --project-name app --no-pub .
+
+      - name: Ajustar identificador, orientación y permisos
+        run: python3 scripts/configure_android.py
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Ejecutar pruebas de fórmulas
+        run: flutter test
+
+      - name: Compilar APK de producción
+        run: flutter build apk --release
+
+      - name: Publicar APK como artefacto descargable
+        uses: actions/upload-artifact@v6
+        with:
+          name: Combo-Manager-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
