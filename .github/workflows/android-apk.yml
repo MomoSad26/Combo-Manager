@@ -155,6 +155,12 @@ jobs:
       - name: Compilar APK firmado
         run: flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
 
+      # La huella debe ser siempre la misma: si cambia, el APK no se instalará encima.
+      - name: Mostrar el certificado de firma
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -E 'SHA-256|DN'
+
       - name: Compilar AAB firmado
         run: flutter build appbundle --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
 

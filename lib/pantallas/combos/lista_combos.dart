@@ -1,5 +1,3 @@
-import 'dart:ui' show Offset;
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -475,7 +473,7 @@ class _FilaComboInteractiva extends StatelessWidget {
         LongPressGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
           () => LongPressGestureRecognizer(
-            duration: const Duration(milliseconds: 800),
+            duration: const Duration(milliseconds: 500),
           ),
           (instance) {
             instance.onLongPressStart = (details) {

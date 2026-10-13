@@ -58,13 +58,21 @@ class ConfiguracionPantalla extends StatelessWidget {
       final confirmar = await DialogoConfirmacion.mostrar(
         context,
         titulo: 'Importar respaldo',
-        mensaje: 'Se agregarán los productos y combos que no tengas todavía. Los que ya tengas se conservan.',
+        mensaje: 'Se agregarán los productos y combos que no tengas todavía. Los que ya tengas se conservan.\n\nEl margen y la tasa se reemplazarán por los del respaldo y se recalcularán los precios.',
       );
       if (!confirmar || !context.mounted) return;
+      final respaldo = context.read<RespaldoService>();
+      final configuracion = context.read<ConfiguracionProvider>();
+      final productos = context.read<ProductoProvider>();
+      final combos = context.read<ComboProvider>();
       final bytes = await archivo.readAsBytes();
-      final resultado = await context.read<RespaldoService>().importar(bytes);
-      await context.read<ProductoProvider>().recargar();
-      await context.read<ComboProvider>().recargar();
+      final resultado = await respaldo.importar(bytes);
+      if (resultado.configuracionCambiada) {
+        await configuracion.aplicarConfiguracionImportada();
+      } else {
+        await productos.recargar();
+        await combos.recargar();
+      }
       if (context.mounted) await _mostrarResumen(context, resultado);
     } on RespaldoVersionNueva {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El respaldo es de una versión más nueva')));
@@ -78,7 +86,7 @@ class ConfiguracionPantalla extends StatelessWidget {
   Future<void> _mostrarResumen(BuildContext context, ResultadoImportacion resultado) async {
     await showDialog<void>(context: context, barrierDismissible: false, builder: (dialogContext) => AlertDialog(
       title: const Text('Importación completada'),
-      content: Text('Productos agregados: ${resultado.productosAgregados}\nCombos agregados: ${resultado.combosAgregados}\nProductos existentes: ${resultado.productosExistentes}\nCombos existentes: ${resultado.combosExistentes}'),
+      content: Text('Productos agregados: ${resultado.productosAgregados}\nCombos agregados: ${resultado.combosAgregados}\nProductos existentes: ${resultado.productosExistentes}\nCombos existentes: ${resultado.combosExistentes}${resultado.configuracionCambiada ? '\nMargen y tasa actualizados' : ''}'),
       actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('ACEPTAR'))],
     ));
   }

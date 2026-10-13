@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'formato_numeros.dart';
@@ -9,16 +10,19 @@ class CompartirCombo {
   static List<ComboItem> productosCompartibles(Combo combo) {
     return combo.items
         .where(
-          (item) =>
-              item.activo &&
-              item.cantidad != null &&
-              item.cantidad! > 0,
+          (item) => item.cantidad != null && item.cantidad! > 0,
         )
         .toList(growable: false);
   }
 
   static bool tieneProductosCompartibles(Combo combo) {
     return productosCompartibles(combo).isNotEmpty;
+  }
+
+  /// El precio del combo incluye a los productos inactivos, así que no se
+  /// comparte hasta quitarlos: el mensaje y el precio no coincidirían.
+  static List<ComboItem> productosInactivos(Combo combo) {
+    return combo.items.where((item) => !item.activo).toList(growable: false);
   }
 
   static String crearMensaje(Combo combo) {
@@ -39,6 +43,17 @@ class CompartirCombo {
   ) async {
     if (!tieneProductosCompartibles(combo)) return;
 
+    final inactivos = productosInactivos(combo);
+    if (inactivos.isNotEmpty) {
+      final nombres = inactivos.map((item) => '• ${item.nombreProducto}').join('\n');
+      await _avisar(
+        context,
+        'Este combo tiene productos inactivos:\n\n$nombres\n\n'
+        'Quítalos del combo antes de compartirlo.',
+      );
+      return;
+    }
+
     final mensaje = crearMensaje(combo);
 
     final uri = Uri.parse(
@@ -56,15 +71,25 @@ class CompartirCombo {
       abierto = false;
     }
 
-    if (abierto || !context.mounted) return;
+    if (abierto) return;
 
+    // Sin WhatsApp, se abre el menú de compartir de Android (Telegram, SMS, etc.).
+    try {
+      await SharePlus.instance.share(ShareParams(text: mensaje));
+    } catch (_) {
+      if (context.mounted) {
+        await _avisar(context, 'No se pudo compartir el combo.');
+      }
+    }
+  }
+
+  static Future<void> _avisar(BuildContext context, String texto) async {
+    if (!context.mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        content: const Text(
-          'WhatsApp no está instalado\nen este teléfono.',
-        ),
+        content: Text(texto),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),

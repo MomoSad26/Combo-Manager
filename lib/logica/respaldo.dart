@@ -107,6 +107,11 @@ class RespaldoService {
     if (configuracionBackup['margen'] is! num || configuracionBackup['tasa_referencia'] is! num) {
       throw const RespaldoInvalido();
     }
+    final margenBackup = _numero(configuracionBackup['margen']);
+    final tasaBackup = _numero(configuracionBackup['tasa_referencia']);
+    if (!margenBackup.isFinite || margenBackup <= 0 || !tasaBackup.isFinite || tasaBackup <= 0) {
+      throw const RespaldoInvalido();
+    }
     for (final c in combosBackup) {
       if (c['nombre'] is! String || (c['nombre'] as String).trim().isEmpty || c['items'] is! List) {
         throw const RespaldoInvalido();
@@ -122,8 +127,13 @@ class RespaldoService {
     var combosAgregados = 0;
     var productosExistentes = 0;
     var combosExistentes = 0;
+    final configuracionCambiada = (configuracionActual.margen - margenBackup).abs() > 1e-12 ||
+        (configuracionActual.tasaReferencia - tasaBackup).abs() > 1e-12;
 
     await db.transaction((txn) async {
+      if (configuracionCambiada) {
+        await txn.update('configuracion', {'margen': margenBackup, 'tasa_referencia': tasaBackup}, where: 'id = 1');
+      }
       final mapaProductos = <String, int>{};
       final productosActuales = await txn.query('productos', columns: ['id', 'nombre'], orderBy: 'id');
       for (final p in productosActuales) {
@@ -238,6 +248,7 @@ class RespaldoService {
       combosAgregados: combosAgregados,
       productosExistentes: productosExistentes,
       combosExistentes: combosExistentes,
+      configuracionCambiada: configuracionCambiada,
     );
   }
 

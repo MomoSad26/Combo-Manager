@@ -76,6 +76,43 @@ void main() {
     expect(destino.combos.combos, isEmpty);
   });
 
+  test('importar aplica el margen y la tasa del respaldo y recalcula los precios', () async {
+    await origen.configuracion.cambiarMargen(2);
+    await origen.configuracion.cambiarTasa(800);
+    await poblarOrigen();
+    await destino.productos.crear(nombre: 'Queso', precioCompra: 1600, precioVenta: 1, precioVentaManual: true);
+
+    final resultado = await servicio(destino).importar(await servicio(origen).crearRespaldo());
+    expect(resultado.configuracionCambiada, isTrue);
+    await destino.configuracion.aplicarConfiguracionImportada();
+
+    expect(destino.configuracion.configuracion.margen, 2);
+    expect(destino.configuracion.configuracion.tasaReferencia, 800);
+    final queso = destino.productos.productos.firstWhere((p) => p.nombre == 'Queso');
+    expect(queso.precioVenta, closeTo(1600 * 2 / 800, 1e-12));
+    final combo = destino.combos.combos.single;
+    expect(combo.ganancia, closeTo(combo.precioCombo * 800 - combo.costoProductos, 1e-8));
+  });
+
+  test('si el respaldo trae el mismo margen y tasa no se marca cambio', () async {
+    await poblarOrigen();
+    final resultado = await servicio(destino).importar(await servicio(origen).crearRespaldo());
+    expect(resultado.configuracionCambiada, isFalse);
+  });
+
+  test('rechaza un respaldo con margen o tasa no positivos sin modificar nada', () async {
+    final respaldo = {
+      'version': 1,
+      'configuracion': {'margen': 0, 'tasa_referencia': 755},
+      'productos': [{'nombre': 'Pan', 'precio_compra': 1000, 'precio_venta': 2}],
+      'combos': [],
+    };
+    await expectLater(servicio(destino).importar(json(respaldo)), throwsA(isA<RespaldoInvalido>()));
+    await destino.productos.recargar();
+    expect(destino.productos.productos, isEmpty);
+    expect((await destino.configuracionRepositorio.obtener()).margen, 1.5);
+  });
+
   test('rechaza archivos que no son respaldos y versiones más nuevas', () async {
     await expectLater(servicio(destino).importar(Uint8List.fromList(utf8.encode('no es json'))), throwsA(isA<RespaldoInvalido>()));
     await expectLater(

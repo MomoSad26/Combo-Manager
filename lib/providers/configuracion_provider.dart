@@ -74,6 +74,10 @@ class ConfiguracionProvider extends ChangeNotifier {
         await _aplicarCascada();
       });
 
+  /// Tras importar un respaldo que cambió el margen o la tasa: recalcula todos los
+  /// precios con los valores nuevos, igual que si se hubieran cambiado a mano.
+  Future<void> aplicarConfiguracionImportada() => _enCola(_aplicarCascada);
+
   Future<void> _aplicarCascada() async {
     _configuracion = await _repositorio.obtener();
     await _productoRepositorio.recalcularTodosLosPrecios(_configuracion);
