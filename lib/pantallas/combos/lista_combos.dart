@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../logica/compartir_combo.dart';
+import '../../logica/buscador_inteligente.dart';
 import '../../logica/formato_numeros.dart';
 import '../../modelos/combo.dart';
 import '../../providers/combo_provider.dart';
@@ -13,8 +14,21 @@ import '../../widgets/boton_volver.dart';
 import '../../widgets/dialogo_confirmacion.dart';
 import 'detalle_combo.dart';
 
-class ListaCombos extends StatelessWidget {
+class ListaCombos extends StatefulWidget {
   const ListaCombos({super.key});
+
+  @override
+  State<ListaCombos> createState() => _ListaCombosState();
+}
+
+class _ListaCombosState extends State<ListaCombos> {
+  final TextEditingController _busqueda = TextEditingController();
+
+  @override
+  void dispose() {
+    _busqueda.dispose();
+    super.dispose();
+  }
 
   Future<void> _crearCombo(BuildContext context) async {
     final controller = TextEditingController();
@@ -254,6 +268,19 @@ class ListaCombos extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<ComboProvider>();
     final oscuro = Theme.of(context).brightness == Brightness.dark;
+    final combosFiltrados = provider.combos
+    .where(
+      (combo) => BuscadorInteligente.coincide(
+        combo.nombre,
+        _busqueda.text,
+      ),
+    )
+    .toList()
+  ..sort(
+    (a, b) => BuscadorInteligente.normalizar(a.nombre).compareTo(
+      BuscadorInteligente.normalizar(b.nombre),
+    ),
+  );
 
     return Scaffold(
       appBar: AppBar(
@@ -261,113 +288,161 @@ class ListaCombos extends StatelessWidget {
         leading: const BotonVolver(),
         title: const Text('COMBOS'),
       ),
-      body: provider.cargando
-          ? const Center(child: CircularProgressIndicator())
-          : provider.combos.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No hay combos todavía. '
-                      'Presiona + CREAR COMBO para comenzar.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                  itemCount: provider.combos.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: Theme.of(context).dividerColor,
-                  ),
-                  itemBuilder: (context, index) {
-                    final combo = provider.combos[index];
-
-                    return _FilaComboInteractiva(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetalleCombo(
-                              comboId: combo.id,
-                            ),
-                          ),
-                        );
-                      },
-                      onLongPress: (posicion) {
-                        _mostrarMenuCombo(context, combo, posicion);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 4,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              combo.nombre,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 8),
-                            if (combo.items.isEmpty)
-                              Text(
-                                'Sin productos',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context).hintColor,
-                                    ),
-                              ),
-                            ...combo.items.map(
-                              (item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 3),
-                                child: Text(
-                                  '• ${item.cantidad ?? '—'} '
-                                  '${item.nombreProducto}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: item.activo
-                                            ? null
-                                            : (oscuro
-                                                ? ColoresApp.rojoOscuro
-                                                : ColoresApp.alerta),
-                                      ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Venta: ${FormatoNumeros.moneda(combo.precioCombo)}'
-                              '    Costo: ${FormatoNumeros.moneda(combo.costoProductos)}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Ganancia: ${FormatoNumeros.moneda(combo.ganancia)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: oscuro
-                                        ? ColoresApp.gananciaOscura
-                                        : ColoresApp.gananciaClaro,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                          ],
-                        ),
+      
+body: provider.cargando
+    ? const Center(child: CircularProgressIndicator())
+    : Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+            child: TextField(
+              controller: _busqueda,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: 'Buscar combo...',
+                border: const OutlineInputBorder(),
+                suffixIcon: _busqueda.text.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Limpiar búsqueda',
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _busqueda.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: provider.combos.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No hay combos todavía. '
+                        'Presiona + CREAR COMBO para comenzar.',
+                        textAlign: TextAlign.center,
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  )
+                : combosFiltrados.isEmpty
+                    ? const Center(
+                        child: Text('No se encontraron combos.'),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          20,
+                        ),
+                        itemCount: combosFiltrados.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
+                        itemBuilder: (context, index) {
+                          final combo = combosFiltrados[index];
+
+                          return _FilaComboInteractiva(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => DetalleCombo(
+                                    comboId: combo.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            onLongPress: (posicion) {
+                              _mostrarMenuCombo(
+                                context,
+                                combo,
+                                posicion,
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 4,
+                              ),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    combo.nombre,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (combo.items.isEmpty)
+                                    Text(
+                                      'Sin productos',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .hintColor,
+                                          ),
+                                    ),
+                                  ...combo.items.map(
+                                    (item) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 3),
+                                      child: Text(
+                                        '• ${item.cantidad ?? '—'} '
+                                        '${item.nombreProducto}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: item.activo
+                                                  ? null
+                                                  : (oscuro
+                                                      ? ColoresApp.rojoOscuro
+                                                      : ColoresApp.alerta),
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Venta: ${FormatoNumeros.moneda(combo.precioCombo)}'
+                                    '    Costo: ${FormatoNumeros.moneda(combo.costoProductos)}',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Ganancia: ${FormatoNumeros.moneda(combo.ganancia)}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: oscuro
+                                              ? ColoresApp.gananciaOscura
+                                              : ColoresApp.gananciaClaro,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
