@@ -1,4 +1,5 @@
-name: Compilar APK Android
+
+name: Compilar APK y AAB Android
 
 on:
   push:
@@ -9,8 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
+  build-android:
     runs-on: ubuntu-latest
+
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v6
@@ -28,19 +30,140 @@ jobs:
       - name: Ajustar identificador, orientación y permisos
         run: python3 scripts/configure_android.py
 
+      - name: Configurar firma de Android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" \
+            | base64 --decode > android/app/upload-keystore.jks
+
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          kts = Path("android/app/build.gradle.kts")
+          groovy = Path("android/app/build.gradle")
+
+          if kts.exists():
+              path = kts
+              imports = (
+                  "import java.util.Properties\n"
+                  "import java.io.FileInputStream\n\n"
+              )
+              props = '''val keystoreProperties = Properties()
+          val keystorePropertiesFile = rootProject.file("key.properties")
+          require(keystorePropertiesFile.exists()) {
+              "No se encontró android/key.properties"
+          }
+          keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+
+          '''
+              signing = '''    signingConfigs {
+                  create("release") {
+                      keyAlias = keystoreProperties["keyAlias"] as String
+                      keyPassword = keystoreProperties["keyPassword"] as String
+                      storeFile = file(keystoreProperties["storeFile"] as String)
+                      storePassword = keystoreProperties["storePassword"] as String
+                  }
+              }
+
+          '''
+          else:
+              path = groovy
+              imports = (
+                  "import java.util.Properties\n"
+                  "import java.io.FileInputStream\n\n"
+              )
+              props = '''def keystoreProperties = new Properties()
+          def keystorePropertiesFile = rootProject.file("key.properties")
+          if (!keystorePropertiesFile.exists()) {
+              throw new GradleException("No se encontró android/key.properties")
+          }
+          keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+          '''
+              signing = '''    signingConfigs {
+                  release {
+                      keyAlias = keystoreProperties['keyAlias']
+                      keyPassword = keystoreProperties['keyPassword']
+                      storeFile = file(keystoreProperties['storeFile'])
+                      storePassword = keystoreProperties['storePassword']
+                  }
+              }
+
+          '''
+
+          if not path.exists():
+              raise SystemExit("No se encontró el archivo Gradle de Android.")
+
+          text = path.read_text(encoding="utf-8")
+
+          if "keystoreProperties" in text:
+              raise SystemExit("La configuración de firma ya existe; no se modificó.")
+
+          if "android {" not in text:
+              raise SystemExit("No se encontró el bloque android en Gradle.")
+
+          text = imports + props + text
+          text = text.replace("android {", "android {\n", 1)
+          text = text.replace("    buildTypes {", signing + "    buildTypes {", 1)
+
+          debug_lines = (
+              'signingConfig = signingConfigs.getByName("debug")',
+              "signingConfig signingConfigs.debug",
+          )
+
+          for line in debug_lines:
+              if line in text:
+                  text = text.replace(
+                      line,
+                      'signingConfig = signingConfigs.getByName("release")',
+                      1,
+                  )
+                  break
+          else:
+              raise SystemExit(
+                  "No se encontró la firma debug esperada en buildTypes.release."
+              )
+
+          path.write_text(text, encoding="utf-8")
+          print("Firma de release configurada correctamente.")
+          PY
+
       - name: Instalar dependencias
         run: flutter pub get
 
-      - name: Ejecutar pruebas de fórmulas
+      - name: Ejecutar pruebas
         run: flutter test
 
-      - name: Compilar APK de producción
+      - name: Compilar APK firmado
         run: flutter build apk --release
 
-      - name: Publicar APK como artefacto descargable
+      - name: Compilar AAB firmado
+        run: flutter build appbundle --release
+
+      - name: Publicar archivos firmados
         uses: actions/upload-artifact@v6
         with:
-          name: Combo-Manager-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: Combo-Manager-Firmados
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
