@@ -181,7 +181,7 @@ class _AnadirProductoComboState extends State<AnadirProductoCombo> {
       ),
     );
   }
-
+}
 
 class _ResultadoCantidad {
   const _ResultadoCantidad(this.cantidad, this.salir, this.valido);
