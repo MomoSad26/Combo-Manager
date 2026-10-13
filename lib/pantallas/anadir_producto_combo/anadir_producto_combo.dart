@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../logica/formato_numeros.dart';
+import '../../logica/buscador_inteligente.dart';
 import '../../providers/combo_provider.dart';
 import '../../providers/producto_provider.dart';
 import '../../widgets/boton_volver.dart';
@@ -74,33 +75,113 @@ class _AnadirProductoComboState extends State<AnadirProductoCombo> {
     return result;
   }
 
+  
   @override
   Widget build(BuildContext context) {
-    final productos = context.watch<ProductoProvider>().productos.where((p) => p.activo).where((p) => p.nombre.toLowerCase().contains(_busqueda.text.trim().toLowerCase())).toList();
+    final productosActivos = context
+        .watch<ProductoProvider>()
+        .productos
+        .where((p) => p.activo)
+        .toList();
+
+    final productos = productosActivos
+        .where(
+          (p) => BuscadorInteligente.coincide(
+            p.nombre,
+            _busqueda.text,
+          ),
+        )
+        .toList()
+      ..sort(
+        (a, b) => BuscadorInteligente.normalizar(a.nombre).compareTo(
+          BuscadorInteligente.normalizar(b.nombre),
+        ),
+      );
+
     return Scaffold(
-      appBar: AppBar(leadingWidth: 112, leading: const BotonVolver(), title: const Text('AÑADIR PRODUCTO')),
-      body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(18, 10, 18, 12), child: TextField(controller: _busqueda, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Buscar producto...', border: OutlineInputBorder()))),
-        Expanded(child: productos.isEmpty
-          ? Center(child: Text(_busqueda.text.isEmpty ? 'No hay productos activos para añadir.' : 'No se encontraron productos.'))
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              itemCount: productos.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Theme.of(context).dividerColor),
-              itemBuilder: (context, index) {
-                final p = productos[index];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
-                  title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text('V: ${FormatoNumeros.moneda(p.precioVenta)}'),
-                  onTap: () => _mostrarCantidad(p.id, p.nombre),
-                );
-              },
-            )),
-      ]),
+      appBar: AppBar(
+        leadingWidth: 112,
+        leading: const BotonVolver(),
+        title: const Text('AÑADIR PRODUCTO'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+            child: TextField(
+              controller: _busqueda,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: 'Buscar producto...',
+                border: const OutlineInputBorder(),
+                suffixIcon: _busqueda.text.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Limpiar búsqueda',
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _busqueda.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: productosActivos.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No hay productos activos para añadir.',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : productos.isEmpty
+                    ? const Center(
+                        child: Text('No se encontraron productos.'),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          20,
+                          0,
+                          20,
+                          16,
+                        ),
+                        itemCount: productos.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
+                        itemBuilder: (context, index) {
+                          final p = productos[index];
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 5,
+                              horizontal: 2,
+                            ),
+                            title: Text(
+                              p.nombre,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'V: ${FormatoNumeros.moneda(p.precioVenta)}',
+                            ),
+                            onTap: () => _mostrarCantidad(
+                              p.id,
+                              p.nombre,
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
-}
+
 
 class _ResultadoCantidad {
   const _ResultadoCantidad(this.cantidad, this.salir, this.valido);
