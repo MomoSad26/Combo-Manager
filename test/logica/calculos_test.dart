@@ -20,6 +20,17 @@ void main() {
       expect(FormatoNumeros.moneda(755.00), '755');
     });
 
+    test('no pierde un centavo por el redondeo interno de los decimales', () {
+      expect(FormatoNumeros.moneda(0.29), '0.29');
+      expect(FormatoNumeros.moneda(4.35), '4.35');
+      expect(FormatoNumeros.moneda(2.01), '2.01');
+      expect(FormatoNumeros.moneda(0.29 * 3), '0.87');
+      expect(FormatoNumeros.moneda(-0.29), '-0.29');
+      expect(FormatoNumeros.moneda(1.98675497), '1.98');
+      expect(FormatoNumeros.moneda(-1.98675497), '-1.98');
+      expect(FormatoNumeros.moneda(0.004), '0');
+    });
+
     test('una tasa no positiva no produce división por cero', () {
       expect(Calculos.precioVentaProducto(1000, 1.5, 0), 0);
     });

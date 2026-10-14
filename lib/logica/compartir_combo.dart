@@ -28,8 +28,12 @@ class CompartirCombo {
   static String crearMensaje(Combo combo) {
     final productos = productosCompartibles(combo);
 
+    // Precio de cada línea: precio de venta actual del producto × cantidad.
     final listaProductos = productos
-        .map((item) => '${item.cantidad} ${item.nombreProducto}')
+        .map(
+          (item) => '${item.cantidad} ${item.nombreProducto}'
+              ' - ${FormatoNumeros.moneda(item.precioVenta * item.cantidad!)}',
+        )
         .join('\n');
 
     return '${combo.nombre.toUpperCase()}\n\n'
