@@ -3,10 +3,10 @@ import 'package:combo_manager/modelos/combo.dart';
 import 'package:combo_manager/modelos/combo_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ComboItem item(String nombre, {int? cantidad, bool activo = true, double precioVenta = 1}) => ComboItem(
+ComboItem item(String nombre, {int? cantidad, bool activo = true, double precioVenta = 1, double? precioFila}) => ComboItem(
       id: nombre.hashCode, comboId: 1, productoId: nombre.hashCode, nombreProducto: nombre,
       precioCompra: 100, precioVenta: precioVenta, activo: activo, cantidad: cantidad,
-      precioFila: cantidad == null ? null : precioVenta * cantidad,
+      precioFila: precioFila ?? (cantidad == null ? null : precioVenta * cantidad),
     );
 
 Combo combo(List<ComboItem> items, {String nombre = 'Desayuno', double precio = 3.5}) => Combo(
@@ -57,6 +57,14 @@ void main() {
     ], nombre: 'Combo Mixto', precio: 9.69);
     expect(CompartirCombo.crearMensaje(c),
         'COMBO MIXTO\n\n3 Cerveza - 7.5\n2 Papas - 1.2\n1 Refresco - 0.99\n\nPrecio: 9.69');
+  });
+
+  test('cada línea usa el precio de la fila aunque se haya editado a mano', () {
+    final c = combo([
+      item('Pan', cantidad: 2, precioVenta: 1, precioFila: 1.5),
+      item('Leche', cantidad: 1, precioVenta: 0.5),
+    ], precio: 2);
+    expect(CompartirCombo.crearMensaje(c), 'DESAYUNO\n\n2 Pan - 1.5\n1 Leche - 0.5\n\nPrecio: 2');
   });
 
   test('el precio final es el del detalle aunque se haya editado a mano', () {
