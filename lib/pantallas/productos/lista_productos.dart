@@ -84,7 +84,7 @@ class _ListaProductosState extends State<ListaProductos> {
                             padding: EdgeInsets.all(24),
                             child: Text(
                               'No hay productos todavía. '
-                              'Presiona + AÑADIR PRODUCTO para comenzar.',
+                              'Presiona + NUEVO PRODUCTO para comenzar.',
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -193,7 +193,10 @@ class _ListaProductosState extends State<ListaProductos> {
               );
             },
             icon: const Icon(Icons.add),
-            label: const Text('AÑADIR PRODUCTO'),
+            label: const Text('NUEVO PRODUCTO'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+            ),
           ),
         ),
       ),

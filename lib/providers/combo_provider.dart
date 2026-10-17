@@ -59,6 +59,11 @@ class ComboProvider extends ChangeNotifier {
     return agregado;
   }
 
+  Future<void> reordenarItems(int comboId, List<int> itemIds) async {
+    await _repositorio.reordenarItems(comboId, itemIds);
+    await recargar();
+  }
+
   Future<void> actualizarCantidad(int itemId, int cantidad) async {
     await _repositorio.actualizarCantidad(itemId, cantidad, await _configuracionRepositorio.obtener());
     await recargar();

@@ -58,7 +58,7 @@ class ConfiguracionPantalla extends StatelessWidget {
       final confirmar = await DialogoConfirmacion.mostrar(
         context,
         titulo: 'Importar respaldo',
-        mensaje: 'Se agregarán los productos y combos que no tengas todavía. Los que ya tengas se conservan.\n\nEl margen y la tasa se reemplazarán por los del respaldo y se recalcularán los precios.',
+        mensaje: 'Se agregarán los productos y combos que no tengas todavía. Los que ya tengas se conservarán sin cambios.\n\nEl margen y la tasa globales se reemplazarán por los del respaldo, sin alterar los precios guardados de los productos y combos existentes.',
       );
       if (!confirmar || !context.mounted) return;
       final respaldo = context.read<RespaldoService>();
@@ -68,11 +68,12 @@ class ConfiguracionPantalla extends StatelessWidget {
       final bytes = await archivo.readAsBytes();
       final resultado = await respaldo.importar(bytes);
       if (resultado.configuracionCambiada) {
-        await configuracion.aplicarConfiguracionImportada();
-      } else {
-        await productos.recargar();
-        await combos.recargar();
+        // Cambia solo los valores globales. No ejecutar la cascada aquí:
+        // el respaldo debe fusionar sin modificar productos/combos existentes.
+        await configuracion.recargar();
       }
+      await productos.recargar();
+      await combos.recargar();
       if (context.mounted) await _mostrarResumen(context, resultado);
     } on RespaldoVersionNueva {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El respaldo es de una versión más nueva')));
@@ -108,6 +109,26 @@ class ConfiguracionPantalla extends StatelessWidget {
         const SizedBox(height: 20),
         const Divider(),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('MODO OSCURO'), value: config.modoOscuro, onChanged: (v) => _ejecutar(context, () => provider.cambiarModoOscuro(v))),
+        const Divider(),
+        const SizedBox(height: 8),
+        Text('VISTA DEL DETALLE DEL COMBO', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        RadioListTile<bool>(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: const Text('Cómodo'),
+          value: false,
+          groupValue: config.detalleComboCompacto,
+          onChanged: (v) { if (v != null) _ejecutar(context, () => provider.cambiarDetalleComboCompacto(v)); },
+        ),
+        RadioListTile<bool>(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: const Text('Compacto'),
+          value: true,
+          groupValue: config.detalleComboCompacto,
+          onChanged: (v) { if (v != null) _ejecutar(context, () => provider.cambiarDetalleComboCompacto(v)); },
+        ),
         const Divider(),
         const SizedBox(height: 8),
         Text('RESPALDO', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),

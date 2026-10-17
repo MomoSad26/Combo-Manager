@@ -59,15 +59,51 @@ class ComboRepositorio {
     if (p.isEmpty) return false;
     final venta = (p.first['precio_venta'] as num).toDouble();
     await db.transaction((txn) async {
+      final ordenRows = await txn.rawQuery(
+        'SELECT COALESCE(MAX(orden), -1) AS ultimo FROM combo_items WHERE combo_id = ?',
+        [comboId],
+      );
+      final orden = ((ordenRows.first['ultimo'] as num?)?.toInt() ?? -1) + 1;
       await txn.insert('combo_items', {
         'combo_id': comboId,
         'producto_id': productoId,
         'cantidad': cantidad,
         'precio_fila': Calculos.precioFila(venta, cantidad),
+        'orden': orden,
       });
       await _recalcularCombo(txn, comboId, configuracion, recalcularFilas: false);
     });
     return true;
+  }
+
+  /// Reordena únicamente las filas del combo. No toca precios, cantidades ni
+  /// los totales (incluidos los que el usuario editó manualmente).
+  Future<void> reordenarItems(int comboId, List<int> itemIds) async {
+    final db = await baseDatos.database;
+    await db.transaction((txn) async {
+      final filas = await txn.query(
+        'combo_items',
+        columns: ['id'],
+        where: 'combo_id = ?',
+        whereArgs: [comboId],
+        orderBy: 'orden, id',
+      );
+      final actuales = filas.map((r) => (r['id'] as num).toInt()).toList();
+      final solicitados = itemIds.toSet();
+      if (actuales.length != itemIds.length ||
+          solicitados.length != itemIds.length ||
+          !actuales.toSet().containsAll(solicitados)) {
+        throw ArgumentError('El orden de productos no coincide con el combo actual.');
+      }
+      for (var i = 0; i < itemIds.length; i++) {
+        await txn.update(
+          'combo_items',
+          {'orden': i},
+          where: 'id = ? AND combo_id = ?',
+          whereArgs: [itemIds[i], comboId],
+        );
+      }
+    });
   }
 
   Future<void> actualizarCantidad(int itemId, int cantidad, Configuracion configuracion) async {

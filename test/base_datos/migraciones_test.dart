@@ -11,11 +11,14 @@ void main() {
     final config = await db.query('configuracion');
     expect(config.single['margen'], 1.5);
     expect(config.single['tasa_referencia'], 755);
+    expect(config.single['detalle_combo_compacto'], 1);
+    final columnasItems = await db.rawQuery('PRAGMA table_info(combo_items)');
+    expect(columnasItems.map((c) => c['name']), contains('orden'));
     await bd.cerrar();
   });
 
   test('al subir de versión se aplican las migraciones sin perder datos', () async {
-    final v1 = await crearBaseDatosPrueba();
+    final v1 = await crearBaseDatosPrueba(version: 1, migraciones: {});
     final ruta = (await v1.database).path;
     await (await v1.database).insert('productos', {'nombre': 'Pan', 'precio_compra': 100, 'precio_venta': 0.2});
     await v1.cerrar();
@@ -40,8 +43,28 @@ void main() {
     await bd.cerrar();
   });
 
+  test('la migración real conserva el orden de inserción y activa el modo compacto', () async {
+    final v1 = await crearBaseDatosPrueba(version: 1, migraciones: {});
+    final ruta = (await v1.database).path;
+    final db1 = await v1.database;
+    final producto1 = await db1.insert('productos', {'nombre': 'Primero', 'precio_compra': 1, 'precio_venta': 2});
+    final producto2 = await db1.insert('productos', {'nombre': 'Segundo', 'precio_compra': 1, 'precio_venta': 2});
+    final combo = await db1.insert('combos', {'nombre': 'Combo'});
+    await db1.insert('combo_items', {'combo_id': combo, 'producto_id': producto1, 'cantidad': 1, 'precio_fila': 2});
+    await db1.insert('combo_items', {'combo_id': combo, 'producto_id': producto2, 'cantidad': 1, 'precio_fila': 2});
+    await v1.cerrar();
+
+    final actualizada = await crearBaseDatosPrueba(ruta: ruta);
+    final db2 = await actualizada.database;
+    final filas = await db2.query('combo_items', orderBy: 'orden, id');
+    expect(filas.map((f) => f['orden']), [0, 1]);
+    final config = (await db2.query('configuracion')).single;
+    expect(config['detalle_combo_compacto'], 1);
+    await actualizada.cerrar();
+  });
+
   test('si falta una migración, la apertura falla en vez de dejar el esquema a medias', () async {
-    final v1 = await crearBaseDatosPrueba();
+    final v1 = await crearBaseDatosPrueba(version: 1, migraciones: {});
     final ruta = (await v1.database).path;
     await v1.cerrar();
     await expectLater(crearBaseDatosPrueba(ruta: ruta, version: 2, migraciones: {}), throwsA(isA<StateError>()));

@@ -20,4 +20,7 @@ class ConfiguracionRepositorio {
   }
 
   Future<void> actualizarModoOscuro(bool valor) async => (await _dao()).actualizar(modoOscuro: valor);
+
+  Future<void> actualizarDetalleComboCompacto(bool valor) async =>
+      (await _dao()).actualizar(detalleComboCompacto: valor);
 }

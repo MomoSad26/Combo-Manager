@@ -7,6 +7,7 @@ import '../../logica/formato_numeros.dart';
 import '../../modelos/combo.dart';
 import '../../modelos/combo_item.dart';
 import '../../providers/combo_provider.dart';
+import '../../providers/configuracion_provider.dart';
 import '../../temas/colores.dart';
 import '../../widgets/boton_volver.dart';
 import '../../widgets/dialogo_confirmacion.dart';
@@ -214,6 +215,7 @@ class DetalleCombo extends StatelessWidget {
     final provider = context.watch<ComboProvider>();
     final combo = provider.porId(comboId);
     final oscuro = Theme.of(context).brightness == Brightness.dark;
+    final compacto = context.watch<ConfiguracionProvider>().configuracion.detalleComboCompacto;
 
     if (combo == null) {
       return Scaffold(
@@ -247,40 +249,80 @@ class DetalleCombo extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
-        children: [
+      body: CustomScrollView(
+        slivers: [
           if (combo.items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Text('Este combo todavía no tiene productos.'),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(18, 18, 18, 8),
+                child: Text('Este combo todavía no tiene productos.'),
+              ),
+            )
+          else
+            SliverReorderableList.builder(
+              itemCount: combo.items.length,
+              onReorder: (oldIndex, newIndex) async {
+                if (newIndex > oldIndex) newIndex--;
+                final ids = combo.items.map((item) => item.id).toList();
+                if (newIndex < 0 || newIndex >= ids.length) return;
+                final movido = ids.removeAt(oldIndex);
+                ids.insert(newIndex, movido);
+                try {
+                  await context.read<ComboProvider>().reordenarItems(combo.id, ids);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No se pudo guardar el nuevo orden.')),
+                    );
+                  }
+                }
+              },
+              itemBuilder: (context, index) {
+                final item = combo.items[index];
+                return ReorderableDelayedDragStartListener(
+                  key: ValueKey('combo-item-${item.id}'),
+                  index: index,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: _filaProducto(context, item, oscuro, compacto),
+                  ),
+                );
+              },
             ),
-          ...combo.items.map(
-            (item) => _filaProducto(context, item, oscuro),
-          ),
-          const SizedBox(height: 14),
-          _campoTotal(
-            context,
-            'PRECIO DEL COMBO',
-            FormatoNumeros.moneda(combo.precioCombo),
-            () => _editarTotal(context, combo, 'precio'),
-          ),
-          const SizedBox(height: 14),
-          _campoTotal(
-            context,
-            'COSTO DE LOS PRODUCTOS',
-            FormatoNumeros.moneda(combo.costoProductos),
-            () => _editarTotal(context, combo, 'costo'),
-          ),
-          const SizedBox(height: 14),
-          _campoTotal(
-            context,
-            'GANANCIA',
-            FormatoNumeros.moneda(combo.ganancia),
-            () => _editarTotal(context, combo, 'ganancia'),
-            color: oscuro
-                ? ColoresApp.gananciaOscura
-                : ColoresApp.gananciaClaro,
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(18, compacto ? 6 : 14, 18, 20),
+              child: Column(
+                children: [
+                  _campoTotal(
+                    context,
+                    'PRECIO DEL COMBO',
+                    FormatoNumeros.moneda(combo.precioCombo),
+                    () => _editarTotal(context, combo, 'precio'),
+                    compacto: compacto,
+                  ),
+                  SizedBox(height: compacto ? 7 : 14),
+                  _campoTotal(
+                    context,
+                    'COSTO DE LOS PRODUCTOS',
+                    FormatoNumeros.moneda(combo.costoProductos),
+                    () => _editarTotal(context, combo, 'costo'),
+                    compacto: compacto,
+                  ),
+                  SizedBox(height: compacto ? 7 : 14),
+                  _campoTotal(
+                    context,
+                    'GANANCIA',
+                    FormatoNumeros.moneda(combo.ganancia),
+                    () => _editarTotal(context, combo, 'ganancia'),
+                    color: oscuro
+                        ? ColoresApp.gananciaOscura
+                        : ColoresApp.gananciaClaro,
+                    compacto: compacto,
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -337,10 +379,89 @@ class DetalleCombo extends StatelessWidget {
     BuildContext context,
     ComboItem item,
     bool oscuro,
+    bool compacto,
   ) {
     final colorNombre = item.activo
         ? Theme.of(context).colorScheme.onSurface
         : (oscuro ? ColoresApp.rojoOscuro : ColoresApp.alerta);
+    final estiloNombre = Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: colorNombre,
+        );
+    final textoPrecio =
+        'Precio: ${item.precioFila == null ? '—' : FormatoNumeros.moneda(item.precioFila!)}';
+
+    if (compacto) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                const Icon(Icons.drag_handle, size: 20),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.nombreProducto}${item.activo ? '' : '  ⚠️'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: estiloNombre,
+                      ),
+                      InkWell(
+                        onTap: () => _editarPrecioFila(context, item),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1),
+                          child: Text(
+                            textoPrecio,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _editarCantidad(context, item),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    minimumSize: const Size(46, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text('Cant: ${item.cantidad ?? '—'}'),
+                ),
+                IconButton(
+                  tooltip: 'Vaciar cantidad y precio',
+                  onPressed: () => context.read<ComboProvider>().limpiarFila(item.id),
+                  icon: const Icon(Icons.cleaning_services_outlined),
+                  iconSize: 19,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 31, minHeight: 32),
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  tooltip: 'Quitar del combo',
+                  onPressed: () => _quitarItem(context, item),
+                  icon: const Icon(Icons.delete_outline),
+                  iconSize: 19,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 31, minHeight: 32),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
+        ],
+      );
+    }
 
     return Column(
       children: [
@@ -351,16 +472,12 @@ class DetalleCombo extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  const Icon(Icons.drag_handle, size: 22),
+                  const SizedBox(width: 5),
                   Expanded(
                     child: Text(
                       '${item.nombreProducto}${item.activo ? '' : '  ⚠️'}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: colorNombre,
-                          ),
+                      style: estiloNombre,
                     ),
                   ),
                   TextButton(
@@ -376,12 +493,9 @@ class DetalleCombo extends StatelessWidget {
                       onTap: () => _editarPrecioFila(context, item),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 2,
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
                         child: Text(
-                          'Precio: ${item.precioFila == null ? '—' : FormatoNumeros.moneda(item.precioFila!)}',
+                          textoPrecio,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                       ),
@@ -389,9 +503,7 @@ class DetalleCombo extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Vaciar cantidad y precio',
-                    onPressed: () => context
-                        .read<ComboProvider>()
-                        .limpiarFila(item.id),
+                    onPressed: () => context.read<ComboProvider>().limpiarFila(item.id),
                     icon: const Icon(Icons.cleaning_services_outlined),
                   ),
                   IconButton(
@@ -404,10 +516,7 @@ class DetalleCombo extends StatelessWidget {
             ],
           ),
         ),
-        Divider(
-          height: 1,
-          color: Theme.of(context).dividerColor,
-        ),
+        Divider(height: 1, color: Theme.of(context).dividerColor),
       ],
     );
   }
@@ -418,6 +527,7 @@ class DetalleCombo extends StatelessWidget {
     String valor,
     VoidCallback onTap, {
     Color? color,
+    bool compacto = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,7 +539,7 @@ class DetalleCombo extends StatelessWidget {
               .labelLarge
               ?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 7),
+        SizedBox(height: compacto ? 4 : 7),
         Material(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -438,9 +548,9 @@ class DetalleCombo extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
+              padding: EdgeInsets.symmetric(
                 horizontal: 15,
-                vertical: 15,
+                vertical: compacto ? 7 : 15,
               ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),

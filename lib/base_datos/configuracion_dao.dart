@@ -8,17 +8,18 @@ class ConfiguracionDao {
   Future<Configuracion> obtener({DatabaseExecutor? executor}) async {
     final rows = await (executor ?? db).query('configuracion', where: 'id = 1', limit: 1);
     if (rows.isEmpty) {
-      await (executor ?? db).insert('configuracion', {'id': 1, 'margen': 1.5, 'tasa_referencia': 755, 'modo_oscuro': 0});
+      await (executor ?? db).insert('configuracion', {'id': 1, 'margen': 1.5, 'tasa_referencia': 755, 'modo_oscuro': 0, 'detalle_combo_compacto': 1});
       return const Configuracion(margen: 1.5, tasaReferencia: 755, modoOscuro: false);
     }
     return Configuracion.fromMap(rows.first);
   }
 
-  Future<void> actualizar({double? margen, double? tasaReferencia, bool? modoOscuro, DatabaseExecutor? executor}) async {
+  Future<void> actualizar({double? margen, double? tasaReferencia, bool? modoOscuro, bool? detalleComboCompacto, DatabaseExecutor? executor}) async {
     final values = <String, Object?>{};
     if (margen != null) values['margen'] = margen;
     if (tasaReferencia != null) values['tasa_referencia'] = tasaReferencia;
     if (modoOscuro != null) values['modo_oscuro'] = modoOscuro ? 1 : 0;
+    if (detalleComboCompacto != null) values['detalle_combo_compacto'] = detalleComboCompacto ? 1 : 0;
     if (values.isNotEmpty) await (executor ?? db).update('configuracion', values, where: 'id = 1');
   }
 }

@@ -9,7 +9,22 @@ typedef Migracion = Future<void> Function(DatabaseExecutor db);
 /// 2. Agrega aquí la entrada `2: (db) async { ... }` con los ALTER TABLE necesarios.
 /// Nunca modifiques una migración ya publicada ni el esquema de `_crearEsquemaV1`:
 /// los teléfonos que ya tienen la app solo ejecutan los pasos que les faltan.
-final Map<int, Migracion> migracionesApp = {};
+final Map<int, Migracion> migracionesApp = {
+  2: (db) async {
+    // Conserva el orden actual (id de inserción) de cada combo antes de
+    // habilitar el reordenamiento persistente.
+    await db.execute('ALTER TABLE combo_items ADD COLUMN orden INTEGER NOT NULL DEFAULT 0');
+    await db.execute('ALTER TABLE configuracion ADD COLUMN detalle_combo_compacto INTEGER NOT NULL DEFAULT 1');
+    final items = await db.query('combo_items', columns: ['id', 'combo_id'], orderBy: 'combo_id, id');
+    final siguienteOrden = <int, int>{};
+    for (final item in items) {
+      final comboId = (item['combo_id'] as num).toInt();
+      final orden = siguienteOrden[comboId] ?? 0;
+      await db.update('combo_items', {'orden': orden}, where: 'id = ?', whereArgs: [item['id']]);
+      siguienteOrden[comboId] = orden + 1;
+    }
+  },
+};
 
 class BaseDatos {
   BaseDatos({
@@ -22,7 +37,7 @@ class BaseDatos {
         _migraciones = migraciones ?? migracionesApp;
 
   static final BaseDatos instancia = BaseDatos();
-  static const int versionActual = 1;
+  static const int versionActual = 2;
 
   final DatabaseFactory? _fabrica;
   final String? _ruta;

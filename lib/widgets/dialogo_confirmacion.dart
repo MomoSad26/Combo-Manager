@@ -15,8 +15,8 @@ class DialogoConfirmacion {
         title: Text(titulo),
         content: Text(mensaje),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(aceptar)),
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(cancelar)),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(aceptar)),
         ],
       ),
     );

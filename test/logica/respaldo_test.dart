@@ -54,7 +54,12 @@ void main() {
     expect(resultado.combosExistentes, 1);
     expect(resultado.combosAgregados, 0);
     await destino.productos.recargar();
+    await destino.combos.recargar();
     expect(destino.productos.productos.map((p) => p.nombre), ['Leche', 'PAN']);
+    final panActual = destino.productos.productos.firstWhere((p) => p.nombre == 'PAN');
+    expect(panActual.precioCompra, 1);
+    expect(panActual.precioVenta, 1);
+    expect(destino.combos.combos.single.items, isEmpty);
   });
 
   test('un respaldo con un error a mitad no modifica nada', () async {
@@ -76,22 +81,47 @@ void main() {
     expect(destino.combos.combos, isEmpty);
   });
 
-  test('importar aplica el margen y la tasa del respaldo y recalcula los precios', () async {
+  test('importar cambia margen y tasa sin alterar registros existentes ni sus precios', () async {
     await origen.configuracion.cambiarMargen(2);
     await origen.configuracion.cambiarTasa(800);
     await poblarOrigen();
     await destino.productos.crear(nombre: 'Queso', precioCompra: 1600, precioVenta: 1, precioVentaManual: true);
 
-    final resultado = await servicio(destino).importar(await servicio(origen).crearRespaldo());
+    final respaldo = await servicio(origen).crearRespaldo();
+    final resultado = await servicio(destino).importar(respaldo);
     expect(resultado.configuracionCambiada, isTrue);
-    await destino.configuracion.aplicarConfiguracionImportada();
+    await destino.configuracion.recargar();
+    await destino.productos.recargar();
+    await destino.combos.recargar();
 
     expect(destino.configuracion.configuracion.margen, 2);
     expect(destino.configuracion.configuracion.tasaReferencia, 800);
     final queso = destino.productos.productos.firstWhere((p) => p.nombre == 'Queso');
-    expect(queso.precioVenta, closeTo(1600 * 2 / 800, 1e-12));
-    final combo = destino.combos.combos.single;
-    expect(combo.ganancia, closeTo(combo.precioCombo * 800 - combo.costoProductos, 1e-8));
+    expect(queso.precioCompra, 1600);
+    expect(queso.precioVenta, 1);
+    expect(queso.precioVentaManual, isTrue);
+
+    // El combo nuevo se importa tal cual aparece en el respaldo.
+    final comboImportado = destino.combos.combos.single;
+    final comboOrigen = origen.combos.combos.single;
+    expect(comboImportado.precioCombo, comboOrigen.precioCombo);
+    expect(comboImportado.costoProductos, comboOrigen.costoProductos);
+    expect(comboImportado.ganancia, comboOrigen.ganancia);
+  });
+
+  test('el orden personalizado de los productos se conserva al exportar e importar', () async {
+    await poblarOrigen();
+    final combo = origen.combos.combos.single;
+    final ordenInvertido = combo.items.reversed.map((item) => item.id).toList();
+    await origen.combos.reordenarItems(combo.id, ordenInvertido);
+
+    final resultado = await servicio(destino).importar(await servicio(origen).crearRespaldo());
+    expect(resultado.combosAgregados, 1);
+    await destino.combos.recargar();
+    expect(
+      destino.combos.combos.single.items.map((item) => item.nombreProducto),
+      ['Leche', 'Pan'],
+    );
   });
 
   test('si el respaldo trae el mismo margen y tasa no se marca cambio', () async {

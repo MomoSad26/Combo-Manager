@@ -30,6 +30,16 @@ void main() {
     expect(app.productos.productos, hasLength(1));
   });
 
+  test('normaliza acentos, ñ y espacios internos al detectar duplicados', () async {
+    expect(await crearProducto('Azúcar'), isNotNull);
+    expect(await crearProducto('a z u c a r'), isNull);
+    expect(await crearProducto('Piña'), isNotNull);
+    expect(await crearProducto('pina'), isNull);
+    expect(await crearProducto('Hamburguesa Grande'), isNotNull);
+    expect(await crearProducto('Hamburguesa'), isNotNull);
+    expect(await crearProducto('Hamburguesa2'), isNotNull);
+  });
+
   test('editar un producto con el nombre de otro se rechaza sin guardar', () async {
     await crearProducto('Pan');
     await crearProducto('Leche');

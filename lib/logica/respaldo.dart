@@ -36,7 +36,7 @@ class RespaldoService {
           p.precio_compra AS producto_precio_compra, p.precio_venta AS producto_precio_venta,
           p.precio_venta_manual AS producto_precio_venta_manual, p.activo AS producto_activo
           FROM combo_items ci INNER JOIN productos p ON p.id = ci.producto_id
-          WHERE ci.combo_id = ? ORDER BY ci.id''', [comboId]);
+          WHERE ci.combo_id = ? ORDER BY ci.orden, ci.id''', [comboId]);
       combosExportados.add({
         'nombre': combo['nombre'],
         'precio_combo': combo['precio_combo'],
@@ -203,40 +203,45 @@ class RespaldoService {
           });
         }
 
+        // Calcula solo como base para los valores automáticos (null). Cada
+        // valor manual que venga informado se conserva de forma independiente.
+        var precioCalculado = 0.0;
+        var costoCalculado = 0.0;
+        for (final item in itemsPreparados) {
+          precioCalculado += (item['precio_fila'] as num?)?.toDouble() ?? 0;
+          costoCalculado += Calculos.costoFila(
+            (item['precio_compra'] as num).toDouble(),
+            (item['cantidad'] as num?)?.toInt(),
+          );
+        }
+        final precioCombo = c['precio_combo'] == null
+            ? precioCalculado
+            : _numero(c['precio_combo']);
+        final costoCombo = c['costo_productos'] == null
+            ? costoCalculado
+            : _numero(c['costo_productos']);
+        final gananciaCombo = c['ganancia'] == null
+            ? Calculos.gananciaCombo(precioCombo, costoCombo, tasaBackup)
+            : _numero(c['ganancia']);
+
         final idCombo = await txn.insert('combos', {
           'nombre': nombreCombo,
-          'precio_combo': c['precio_combo'] == null ? 0 : _numero(c['precio_combo']),
-          'costo_productos': c['costo_productos'] == null ? 0 : _numero(c['costo_productos']),
-          'ganancia': c['ganancia'] == null ? 0 : _numero(c['ganancia']),
-          'precio_manual': _booleano(c['precio_manual']) ? 1 : 0,
-          'costo_manual': _booleano(c['costo_manual']) ? 1 : 0,
-          'ganancia_manual': _booleano(c['ganancia_manual']) ? 1 : 0,
+          'precio_combo': precioCombo,
+          'costo_productos': costoCombo,
+          'ganancia': gananciaCombo,
+          'precio_manual': c['precio_combo'] != null && _booleano(c['precio_manual']) ? 1 : 0,
+          'costo_manual': c['costo_productos'] != null && _booleano(c['costo_manual']) ? 1 : 0,
+          'ganancia_manual': c['ganancia'] != null && _booleano(c['ganancia_manual']) ? 1 : 0,
         });
-        for (final item in itemsPreparados) {
+        for (var i = 0; i < itemsPreparados.length; i++) {
+          final item = itemsPreparados[i];
           await txn.insert('combo_items', {
             'combo_id': idCombo,
             'producto_id': item['producto_id'],
             'cantidad': item['cantidad'],
             'precio_fila': item['precio_fila'],
+            'orden': i,
           });
-        }
-
-        // Si los tres valores no vienen en el respaldo (o son null), se crean en modo automático.
-        if (c['precio_combo'] == null || c['costo_productos'] == null || c['ganancia'] == null) {
-          double precio = 0;
-          double costo = 0;
-          for (final item in itemsPreparados) {
-            precio += (item['precio_fila'] as num?)?.toDouble() ?? 0;
-            costo += Calculos.costoFila((item['precio_compra'] as num).toDouble(), (item['cantidad'] as num?)?.toInt());
-          }
-          await txn.update('combos', {
-            'precio_combo': precio,
-            'costo_productos': costo,
-            'ganancia': Calculos.gananciaCombo(precio, costo, configuracionActual.tasaReferencia),
-            'precio_manual': 0,
-            'costo_manual': 0,
-            'ganancia_manual': 0,
-          }, where: 'id = ?', whereArgs: [idCombo]);
         }
         nombresCombosActuales.add(normalizarNombre(nombreCombo));
         combosAgregados++;

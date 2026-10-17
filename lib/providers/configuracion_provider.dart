@@ -87,6 +87,12 @@ class ConfiguracionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> cambiarDetalleComboCompacto(bool valor) => _enCola(() async {
+        await _repositorio.actualizarDetalleComboCompacto(valor);
+        _configuracion = await _repositorio.obtener();
+        notifyListeners();
+      });
+
   Future<void> cambiarModoOscuro(bool valor) => _enCola(() async {
         await _repositorio.actualizarModoOscuro(valor);
         _configuracion = await _repositorio.obtener();

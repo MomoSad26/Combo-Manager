@@ -17,7 +17,7 @@ class ComboDao {
       (executor ?? db).rawQuery('''SELECT ci.id AS item_id, ci.combo_id, ci.producto_id,
         ci.cantidad, ci.precio_fila, p.nombre, p.precio_compra, p.precio_venta, p.activo
         FROM combo_items ci INNER JOIN productos p ON p.id = ci.producto_id
-        WHERE ci.combo_id = ? ORDER BY ci.id''', [comboId]);
+        WHERE ci.combo_id = ? ORDER BY ci.orden, ci.id''', [comboId]);
 
   Future<List<int>> combosQueContienenProducto(int productoId, {DatabaseExecutor? executor}) async {
     final rows = await (executor ?? db).query('combo_items', columns: ['combo_id'], where: 'producto_id = ?', whereArgs: [productoId]);
