@@ -259,7 +259,7 @@ class DetalleCombo extends StatelessWidget {
               ),
             )
           else
-            SliverReorderableList.builder(
+            SliverReorderableList(
               itemCount: combo.items.length,
               onReorder: (oldIndex, newIndex) async {
                 if (newIndex > oldIndex) newIndex--;
